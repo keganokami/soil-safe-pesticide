@@ -1,45 +1,49 @@
 # 土にやさしい農薬チェッカー
 
-農薬の**商品名**を入力すると、150cm×150cm（土の高さ約60cm）の区画で
-土壌の活性を損なわずに使えるかを AI エージェントが判定する Web アプリです。
+農薬の**商品名**から、150cm×150cm（土の高さ約60cm）の区画で土壌の活性を損なわずに使えるかを判定し、
+結果を GitHub Pages で公開する静的サイトです。判定は **週1回の GitHub Actions** で Claude Code が生成します（API従量課金なし）。
 
-- **出力**: 判定（許可 / 条件付き許可 / 不可 / 判定不能）、許可時は区画あたりの使用量・使い方・こぼれ対策、不可時は理由と代替案、参照URL
+- **出力**: 判定（許可 / 条件付き許可 / 不可 / 判定不能）、土壌影響評価（残留性・移動性・土壌生物・流出時リスク）、
+  許可時は区画あたりの使用量・使い方・こぼれ対策、不可時は理由と代替案、参照URL
 
 ## 仕組み
 
-1. **農林水産省 農薬登録情報提供システム**（https://pesticide.maff.go.jp/）を商品名で検索し、
-   登録番号・有効成分・適用表を取得（公開APIが無いため検索フォーム/詳細ページをサーバー側で解析）
-2. **Claude（claude-opus-5-5）** が Web 検索・取得ツールで、有効成分の土壌半減期(DT50)・Koc・
-   ミミズ/土壌微生物毒性・水生生物毒性を、農水省/環境省/食品安全委員会の評価書、メーカーSDS、
-   PPDB(Univ. of Hertfordshire) などから調査
-3. 判定基準（土壌残留性・移動性・土壌生物・流出時リスク・作用様式）に沿って構造化された判定を返却
-   （10aあたりの量 × 0.00225 で区画量を換算）
+```
+data/products.txt ──(週1 Actions: npm run generate)──▶ public/data/*.json ──(Pages デプロイ)──▶ 静的サイト
+   ▲                     │
+   │                     ├─ 1. 農林水産省 農薬登録情報提供システムで登録番号・有効成分・適用表を取得
+   │                     └─ 2. Claude Code (claude -p, WebSearch/WebFetch) が環境データを調査し JSON スキーマで判定
+   └── Issue「判定リクエスト」に approved ラベル → 自動追加して即判定
+```
 
 | パス | 役割 |
 |---|---|
+| `data/products.txt` | 判定対象の商品名リスト（`商品名` または `商品名,登録番号`） |
+| `scripts/generate.mts` | 判定JSON生成（未判定・90日以上前のものを1回最大10件） |
 | `src/lib/famic.ts` | 農薬登録情報の検索・詳細取得 |
-| `src/lib/agent.ts` | 判定エージェント（システムプロンプト・判定基準・ツールループ） |
-| `src/lib/verdict.ts` | 判定結果のスキーマ |
-| `src/app/api/search` | 商品名→候補一覧 |
-| `src/app/api/judge` | 判定（SSEで進捗をストリーミング） |
+| `src/lib/prompt.ts` | 判定基準・調査方針（システムプロンプト） |
+| `src/lib/verdict.ts` | 判定結果の JSON スキーマ |
+| `public/data/` | 生成された判定データ |
+| `.github/workflows/generate.yml` | 週1回（月曜 3:00 JST）の生成 |
+| `.github/workflows/deploy.yml` | GitHub Pages へのデプロイ |
+| `.github/workflows/request.yml` | Issue からの判定リクエスト受付 |
 
-## ローカル実行
+## セットアップ
+
+1. ローカルで `claude setup-token` を実行し、表示されたトークンをリポジトリの Secret `CLAUDE_CODE_OAUTH_TOKEN` に登録
+2. Settings → Pages → Source を **GitHub Actions** に設定
+3. Issues で `approved` ラベルを作成（リクエスト受付を使う場合）
+4. Actions → 「判定JSONの生成」を手動実行して動作確認
+
+## ローカル
 
 ```bash
-cp .env.example .env.local   # ANTHROPIC_API_KEY を設定
 npm install
-npm run dev                  # http://localhost:3000
+npm run generate   # ローカルの Claude Code ログインで判定を生成
+npm run dev        # http://localhost:3000
 ```
-
-## デプロイ（Vercel）
-
-APIキーをサーバー側で保持する必要があるため GitHub Pages（静的ホスティング）ではなく **Vercel** を使います。
-
-1. GitHub に push → Vercel で Import
-2. Environment Variables に `ANTHROPIC_API_KEY`（任意で `APP_PASSCODE`）を設定
-3. API ルートは東京リージョン(`hnd1`)・最大300秒で動作します
 
 ## 注意
 
 - 判定は参考情報です。使用前に必ず製品ラベルを確認し、農薬取締法（適用作物以外への使用禁止など）に従ってください。
-- 1回の判定で Claude API の利用料（Web検索含む）が発生します。公開する場合は `APP_PASSCODE` の設定を推奨します。
+- 生成は Claude の Max/Pro プランの利用枠を消費します。件数は `MAX_PER_RUN` で調整できます。

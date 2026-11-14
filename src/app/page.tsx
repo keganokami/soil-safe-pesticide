@@ -1,16 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { Candidate, PesticideDetail } from "@/lib/famic";
+import { useEffect, useMemo, useState } from "react";
+import type { PesticideDetail } from "@/lib/famic";
 import type { Verdict, Level } from "@/lib/verdict";
+import type { IndexEntry, VerdictFile } from "@/lib/data";
 
-type Log = { kind: "status" | "search" | "fetch" | "error"; text: string };
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "";
 
-const VERDICT_STYLE: Record<Verdict["verdict"], { bg: string; label: string; icon: string }> = {
-  許可: { bg: "bg-emerald-600", label: "使用OK", icon: "✓" },
-  条件付き許可: { bg: "bg-amber-500", label: "条件付きでOK", icon: "!" },
-  不可: { bg: "bg-rose-600", label: "使用NG", icon: "✕" },
-  判定不能: { bg: "bg-stone-500", label: "判定できません", icon: "?" },
+const VERDICT_STYLE: Record<Verdict["verdict"], { bg: string; chip: string; label: string; icon: string }> = {
+  許可: { bg: "bg-emerald-600", chip: "bg-emerald-100 text-emerald-800", label: "使用OK", icon: "✓" },
+  条件付き許可: { bg: "bg-amber-500", chip: "bg-amber-100 text-amber-800", label: "条件付きでOK", icon: "!" },
+  不可: { bg: "bg-rose-600", chip: "bg-rose-100 text-rose-800", label: "使用NG", icon: "✕" },
+  判定不能: { bg: "bg-stone-500", chip: "bg-stone-200 text-stone-700", label: "判定できません", icon: "?" },
 };
 const LEVEL_STYLE: Record<Level, string> = {
   低: "bg-emerald-100 text-emerald-800",
@@ -19,109 +21,41 @@ const LEVEL_STYLE: Record<Level, string> = {
   不明: "bg-stone-200 text-stone-700",
 };
 
+const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+// ひらがな→カタカナ（「ろはぴ」でも「ロハピ」に当たるように）
+const kata = (s: string) => s.replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+
 export default function Home() {
+  const [index, setIndex] = useState<IndexEntry[] | null>(null);
   const [query, setQuery] = useState("");
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [logs, setLogs] = useState<Log[]>([]);
-  const [detail, setDetail] = useState<PesticideDetail | null | undefined>(undefined);
-  const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [selected, setSelected] = useState<VerdictFile | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [passcode, setPasscode] = useState("");
-  const abortRef = useRef<AbortController | null>(null);
 
-  const reset = () => {
-    setCandidates(null);
-    setLogs([]);
-    setDetail(undefined);
-    setVerdict(null);
+  useEffect(() => {
+    fetch(`${BASE}/data/index.json`, { cache: "no-cache" })
+      .then((r) => r.json())
+      .then(setIndex)
+      .catch(() => setError("判定データを読み込めませんでした"));
+  }, []);
+
+  const results = useMemo(() => {
+    if (!index) return [];
+    const q = kata(norm(query));
+    if (!q) return index;
+    return index.filter((e) =>
+      [e.name, e.query, e.pesticideType, e.registrationNumber].some((f) => kata(norm(f)).includes(q)),
+    );
+  }, [index, query]);
+
+  async function open(e: IndexEntry) {
     setError(null);
-  };
-
-  async function onSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    abortRef.current?.abort();
-    reset();
-    setSearching(true);
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "検索に失敗しました");
-      const list: Candidate[] = data.candidates;
-      const exact = list.filter((c) => c.name === q.normalize("NFKC"));
-      if (list.length === 1 || exact.length === 1) {
-        await judge(q, (exact[0] ?? list[0]).registrationNumber);
-      } else {
-        setCandidates(list);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  async function judge(q: string, registrationNumber: string | null) {
-    setCandidates(null);
-    setRunning(true);
-    setLogs([]);
-    setVerdict(null);
-    setError(null);
-    const ac = new AbortController();
-    abortRef.current = ac;
-    try {
-      const res = await fetch("/api/judge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-app-passcode": passcode },
-        body: JSON.stringify({ query: q, registrationNumber }),
-        signal: ac.signal,
-      });
-      if (!res.ok || !res.body) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
-        for (const part of parts) {
-          const line = part.replace(/^data: /, "");
-          if (!line) continue;
-          const ev = JSON.parse(line);
-          switch (ev.type) {
-            case "status":
-              setLogs((l) => [...l, { kind: "status", text: ev.message }]);
-              break;
-            case "search":
-              setLogs((l) => [...l, { kind: "search", text: ev.query }]);
-              break;
-            case "fetch":
-              setLogs((l) => [...l, { kind: "fetch", text: ev.url }]);
-              break;
-            case "detail":
-              setDetail(ev.detail);
-              break;
-            case "verdict":
-              setVerdict(ev.verdict);
-              break;
-            case "error":
-              setError(ev.message);
-              break;
-          }
-        }
-      }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setRunning(false);
+      const r = await fetch(`${BASE}/data/verdicts/${e.id}.json`, { cache: "no-cache" });
+      if (!r.ok) throw new Error();
+      setSelected(await r.json());
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      setError("判定結果を読み込めませんでした");
     }
   }
 
@@ -131,102 +65,73 @@ export default function Home() {
         <p className="text-sm font-semibold tracking-widest text-emerald-700">SOIL-FRIENDLY CHECK</p>
         <h1 className="mt-1 text-3xl font-bold">土にやさしい農薬チェッカー</h1>
         <p className="mt-3 text-stone-600">
-          農薬の商品名を入力すると、農林水産省の農薬登録情報と専門機関の環境データをAIが調べ、
-          <strong>150cm×150cm・土の高さ約60cm</strong> の区画で土壌の活性を損なわずに使えるかを判定します。
+          農林水産省の農薬登録情報と専門機関の環境データをもとに、
+          <strong>150cm×150cm・土の高さ約60cm</strong> の区画で土壌の活性を損なわずに使えるかを判定しています。
         </p>
       </header>
 
-      <form onSubmit={onSearch} className="flex flex-col gap-3 sm:flex-row">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="商品名（例：ロハピ）"
-          className="flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 text-lg outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200"
-          maxLength={60}
-          disabled={running}
-        />
-        <button
-          type="submit"
-          disabled={running || searching || !query.trim()}
-          className="rounded-xl bg-emerald-700 px-6 py-3 text-lg font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
-        >
-          {searching ? "検索中…" : running ? "判定中…" : "判定する"}
-        </button>
-      </form>
-      <details className="mt-2 text-sm text-stone-500">
-        <summary className="cursor-pointer">パスコード（設定されている場合）</summary>
-        <input
-          type="password"
-          value={passcode}
-          onChange={(e) => setPasscode(e.target.value)}
-          className="mt-2 rounded-lg border border-stone-300 bg-white px-3 py-1"
-        />
-      </details>
-
-      {error && <div className="mt-6 rounded-xl border border-rose-300 bg-rose-50 p-4 text-rose-800">{error}</div>}
-
-      {candidates && (
-        <section className="mt-8">
-          {candidates.length === 0 ? (
-            <div className="rounded-xl border border-stone-300 bg-white p-5">
-              <p>農薬登録情報に「{query}」は見つかりませんでした。</p>
-              <p className="mt-1 text-sm text-stone-600">
-                登録の無い製品（忌避剤・資材など）や表記違いの可能性があります。Web情報からAIに調べさせることもできます。
-              </p>
-              <button
-                onClick={() => judge(query.trim(), null)}
-                className="mt-4 rounded-lg bg-stone-700 px-4 py-2 font-bold text-white hover:bg-stone-800"
-              >
-                Web情報で判定する
-              </button>
-            </div>
-          ) : (
-            <>
-              <h2 className="mb-3 font-bold">候補が {candidates.length} 件あります。対象の製品を選んでください</h2>
-              <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-300 bg-white">
-                {candidates.map((c) => (
-                  <li key={c.registrationNumber}>
-                    <button
-                      onClick={() => judge(c.name, c.registrationNumber)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-emerald-50"
+      {selected ? (
+        <>
+          <button onClick={() => setSelected(null)} className="text-sm text-emerald-700 underline">
+            ← 一覧に戻る
+          </button>
+          <Result verdict={selected.verdict} detail={selected.detail} />
+          <p className="mt-4 text-xs text-stone-500">
+            判定日: {new Date(selected.generatedAt).toLocaleDateString("ja-JP")}（{selected.model}）
+          </p>
+        </>
+      ) : (
+        <>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="商品名で検索（例：ロハピ）"
+            className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-lg outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200"
+            maxLength={60}
+          />
+          {error && <div className="mt-6 rounded-xl border border-rose-300 bg-rose-50 p-4 text-rose-800">{error}</div>}
+          {index && (
+            <section className="mt-6">
+              {results.length > 0 ? (
+                <ul className="divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-300 bg-white">
+                  {results.map((e) => (
+                    <li key={e.id}>
+                      <button
+                        onClick={() => open(e)}
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-emerald-50"
+                      >
+                        <span className="min-w-0">
+                          <span className="font-bold">{e.name}</span>
+                          <span className="ml-2 text-sm text-stone-500">{e.pesticideType}</span>
+                        </span>
+                        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${VERDICT_STYLE[e.verdict].chip}`}>
+                          {VERDICT_STYLE[e.verdict].label}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-xl border border-stone-300 bg-white p-5">
+                  <p>「{query}」はまだ判定されていません。</p>
+                  <p className="mt-1 text-sm text-stone-600">判定は週1回まとめて追加されます。</p>
+                  {REPO_URL && (
+                    <a
+                      href={`${REPO_URL}/issues/new?template=request.yml&title=${encodeURIComponent(`判定リクエスト: ${query}`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 inline-block rounded-lg bg-stone-700 px-4 py-2 font-bold text-white hover:bg-stone-800"
                     >
-                      <span>
-                        <span className="font-bold">{c.name}</span>
-                        <span className="ml-2 text-sm text-stone-500">{c.type}</span>
-                      </span>
-                      <span className="shrink-0 text-xs text-stone-500">登録第{c.registrationNumber}号</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {candidates.length >= 20 && (
-                <p className="mt-2 text-sm text-stone-500">候補が多いため先頭20件のみ表示しています。正式名称で絞り込んでください。</p>
+                      判定をリクエストする（GitHub）
+                    </a>
+                  )}
+                </div>
               )}
-            </>
+              <p className="mt-3 text-xs text-stone-500">判定済み {index.length} 件</p>
+            </section>
           )}
-        </section>
+        </>
       )}
-
-      {(running || logs.length > 0) && !verdict && (
-        <section className="mt-8 rounded-xl border border-stone-300 bg-white p-5">
-          <h2 className="mb-3 flex items-center gap-2 font-bold">
-            {running && <span className="h-3 w-3 animate-ping rounded-full bg-emerald-600" />}
-            調査の進行状況
-          </h2>
-          <p className="mb-3 text-sm text-stone-500">Web調査を含むため1〜3分ほどかかります。</p>
-          <ol className="space-y-1 text-sm">
-            {logs.map((l, i) => (
-              <li key={i} className="break-all">
-                {l.kind === "search" && <>🔎 検索: {l.text}</>}
-                {l.kind === "fetch" && <>📄 参照: {l.text}</>}
-                {l.kind === "status" && <>・{l.text}</>}
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-
-      {verdict && <Result verdict={verdict} detail={detail ?? null} />}
 
       <footer className="mt-16 border-t border-stone-300 pt-6 text-xs leading-relaxed text-stone-500">
         <p>

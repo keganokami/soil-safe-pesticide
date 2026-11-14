@@ -1,0 +1,16 @@
+name: 判定リクエスト
+description: まだ判定されていない農薬の判定を依頼します
+title: "判定リクエスト: "
+body:
+  - type: input
+    id: name
+    attributes:
+      label: 商品名
+      description: 製品ラベルに書かれている名前（例：ロハピ）
+    validations:
+      required: true
+  - type: input
+    id: reg
+    attributes:
+      label: 登録番号（わかれば）
+      description: ラベルの「農林水産省登録第○○○○○号」の数字

@@ -1,0 +1,49 @@
+name: 判定リクエストの受付
+
+# Issue に「approved」ラベルを付けると、商品名を data/products.txt に追加してすぐ判定を開始します
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: products-txt
+  cancel-in-progress: false
+
+jobs:
+  add:
+    if: github.event.label.name == 'approved'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 商品名を追加
+        id: add
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: node scripts/add-request.mjs
+      - name: コミットして判定を開始
+        if: steps.add.outputs.name != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.add.outputs.name }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/products.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "判定リクエストを追加: ${NAME} (#${ISSUE})"
+            git pull --rebase
+            git push
+          fi
+          gh workflow run generate.yml -f only="${NAME%%,*}"
+          gh issue comment "$ISSUE" --body "「${NAME}」を判定リストに追加し、判定を開始しました。数分〜十数分でサイトに反映されます。"
+          gh issue close "$ISSUE"
