@@ -3,6 +3,8 @@ export type Level = "低" | "中" | "高" | "不明";
 export type Verdict = {
   verdict: "許可" | "条件付き許可" | "不可" | "判定不能";
   summary: string;
+  /** 利用者が必ず守るべき最重要の注意点（ファーストビューに表示）。古いデータには無い */
+  keyCautions?: string[];
   product: {
     name: string;
     registrationNumber: string;
@@ -48,10 +50,15 @@ const level = {
 export const VERDICT_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["verdict", "summary", "product", "soilAssessment", "reasons", "usage", "alternatives", "sources"],
+  required: ["verdict", "summary", "keyCautions", "product", "soilAssessment", "reasons", "usage", "alternatives", "sources"],
   properties: {
     verdict: { type: "string", enum: ["許可", "条件付き許可", "不可", "判定不能"] },
     summary: { type: "string", description: "判定の要旨（2〜3文）" },
+    keyCautions: {
+      ...strArr,
+      description:
+        "利用者が必ず守るべき最重要の注意点を3〜5個、重要な順に。各40字程度の短い命令形。許可でも必ず書く。不可・判定不能なら『使わない』とその要点",
+    },
     product: {
       type: "object",
       additionalProperties: false,

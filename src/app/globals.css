@@ -1,12 +1,44 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f7f5ef;
-  --foreground: #2b2a26;
+/* デザインシステム: design-system/soil-safe-pesticide/MASTER.md（Earth green + harvest gold） */
+@theme {
+  --color-primary: #15803d;       /* 白文字 5.0:1 */
+  --color-primary-strong: #14532d;
+  --color-bg: #f6f8f3;
+  --color-ink: #1c2a1f;
+  --color-muted: #52605a;         /* 背景上 6:1 */
+  --color-line: #d9e3d4;
+
+  --color-ok-soft: #dcfce7;
+  --color-ok-strong: #166534;
+  --color-caution: #a16207;       /* 白文字 5.1:1 */
+  --color-caution-soft: #fef6dc;
+  --color-caution-strong: #854d0e;
+  --color-danger: #b91c1c;        /* 白文字 6.5:1 */
+  --color-danger-soft: #fee2e2;
+  --color-danger-strong: #991b1b;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
