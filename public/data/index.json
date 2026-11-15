@@ -1,5 +1,23 @@
 [
   {
+    "id": "23478",
+    "query": "バスアミド微粒剤",
+    "name": "バスアミド微粒剤",
+    "registrationNumber": "23478",
+    "pesticideType": "ダゾメット粉粒剤",
+    "verdict": "不可",
+    "generatedAt": "2026-11-15T02:26:15.088Z"
+  },
+  {
+    "id": "q-d3b81c6f7a",
+    "query": "ベニカXファインスプレー",
+    "name": "ベニカXファインスプレー",
+    "registrationNumber": "第22506号",
+    "pesticideType": "殺虫殺菌剤（そのまま使うスプレー剤）",
+    "verdict": "条件付き許可",
+    "generatedAt": "2026-11-15T02:25:11.960Z"
+  },
+  {
     "id": "24181",
     "query": "ロハピ",
     "name": "ロハピ",
