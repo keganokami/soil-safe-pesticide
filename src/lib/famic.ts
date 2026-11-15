@@ -56,8 +56,24 @@ async function get(url: string, jar: CookieJar) {
   return res;
 }
 
-/** 商品名で検索して候補一覧を返す（1ページ目のみ） */
+/** 英数字・記号を全角に（FAMICは「ベニカＸ」のように全角で登録されていることが多い） */
+const toFullWidth = (s: string) =>
+  s.replace(/[!-~]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0xfee0)).replace(/ /g, "　");
+
+/**
+ * 商品名で検索して候補一覧を返す（1ページ目のみ）。
+ * FAMICの検索は半角/全角を区別するため、入力そのまま → 半角 → 全角 の順で試す。
+ */
 export async function searchByName(name: string): Promise<Candidate[]> {
+  const variants = [...new Set([name, normalize(name), toFullWidth(normalize(name))])];
+  for (const v of variants) {
+    const found = await searchOnce(v);
+    if (found.length) return found;
+  }
+  return [];
+}
+
+async function searchOnce(name: string): Promise<Candidate[]> {
   const jar = new CookieJar();
   const formRes = await get(`${FAMIC_BASE}/agricultural-chemicals/name-search/`, jar);
   if (!formRes.ok) throw new Error(`FAMIC search form: HTTP ${formRes.status}`);
