@@ -25,18 +25,36 @@ const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/\s+/g, ""
 // ひらがな→カタカナ（「ろはぴ」でも「ロハピ」に当たるように）
 const kata = (s: string) => s.replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
 
+/** タイムアウト付きで JSON を取得（固まったままにしない） */
+async function fetchJson<T>(url: string, timeoutMs = 15000): Promise<T> {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { cache: "no-cache", signal: ac.signal });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return (await r.json()) as T;
+  } catch (e) {
+    if ((e as Error).name === "AbortError") throw new Error("タイムアウト");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default function Home() {
   const [index, setIndex] = useState<IndexEntry[] | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<VerdictFile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    fetch(`${BASE}/data/index.json`, { cache: "no-cache" })
-      .then((r) => r.json())
+    setError(null);
+    fetchJson<IndexEntry[]>(`${BASE}/data/index.json`)
       .then(setIndex)
-      .catch(() => setError("判定データを読み込めませんでした"));
-  }, []);
+      .catch((e) => setError(`判定データを読み込めませんでした（${e.message}）`));
+  }, [reloadKey]);
 
   const results = useMemo(() => {
     if (!index) return [];
@@ -49,13 +67,14 @@ export default function Home() {
 
   async function open(e: IndexEntry) {
     setError(null);
+    setOpening(e.id);
     try {
-      const r = await fetch(`${BASE}/data/verdicts/${e.id}.json`, { cache: "no-cache" });
-      if (!r.ok) throw new Error();
-      setSelected(await r.json());
+      setSelected(await fetchJson<VerdictFile>(`${BASE}/data/verdicts/${e.id}.json`));
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
-      setError("判定結果を読み込めませんでした");
+    } catch (err) {
+      setError(`判定結果を読み込めませんでした（${(err as Error).message}）`);
+    } finally {
+      setOpening(null);
     }
   }
 
@@ -89,7 +108,23 @@ export default function Home() {
             className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-lg outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200"
             maxLength={60}
           />
-          {error && <div className="mt-6 rounded-xl border border-rose-300 bg-rose-50 p-4 text-rose-800">{error}</div>}
+          {error && (
+            <div className="mt-6 rounded-xl border border-rose-300 bg-rose-50 p-4 text-rose-800">
+              <p>{error}</p>
+              <button
+                onClick={() => setReloadKey((k) => k + 1)}
+                className="mt-3 rounded-lg bg-rose-700 px-4 py-1.5 text-sm font-bold text-white hover:bg-rose-800"
+              >
+                再読み込み
+              </button>
+            </div>
+          )}
+          {!index && !error && (
+            <p className="mt-6 flex items-center gap-2 text-stone-500">
+              <span className="h-3 w-3 animate-pulse rounded-full bg-emerald-600" />
+              判定データを読み込み中…
+            </p>
+          )}
           {index && (
             <section className="mt-6">
               {results.length > 0 ? (
@@ -98,7 +133,8 @@ export default function Home() {
                     <li key={e.id}>
                       <button
                         onClick={() => open(e)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-emerald-50"
+                        disabled={opening !== null}
+                        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-emerald-50 ${opening === e.id ? "animate-pulse bg-emerald-50" : ""}`}
                       >
                         <span className="min-w-0">
                           <span className="font-bold">{e.name}</span>
