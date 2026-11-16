@@ -1,49 +1,101 @@
 name: 判定リクエストの受付
 
-# Issue に「approved」ラベルを付けると、商品名を data/products.txt に追加してすぐ判定を開始します
+# 「判定リクエスト」テンプレートで Issue が立ったら自動で判定し、結果を Issue に返信する。
+# 手動でやり直したい場合は Issue に「approved」ラベルを付ける。
 on:
   issues:
-    types: [labeled]
+    types: [opened, edited, labeled]
 
 permissions:
   contents: write
   issues: write
-  actions: write
 
 concurrency:
-  group: products-txt
+  group: data-write
   cancel-in-progress: false
 
 jobs:
-  add:
-    if: github.event.label.name == 'approved'
+  judge:
+    if: >-
+      github.event.issue.state == 'open' && (
+        (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, '判定リクエスト')) ||
+        (github.event.action == 'edited' && contains(github.event.issue.labels.*.name, '要確認')) ||
+        (github.event.action == 'labeled' && github.event.label.name == 'approved')
+      )
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: 商品名を追加
+          cache: npm
+      - name: 受付コメント
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" --body "リクエストを受け付けました。判定を始めます（数分〜十数分かかります）。"
+      - name: 商品名を取り出してリストに追加
         id: add
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: node scripts/add-request.mjs
-      - name: コミットして判定を開始
-        if: steps.add.outputs.name != ''
+      - run: npm ci
+        if: steps.add.outputs.query != ''
+      - run: npm install -g @anthropic-ai/claude-code
+        if: steps.add.outputs.query != ''
+      - name: 判定
+        if: steps.add.outputs.query != ''
         env:
-          GH_TOKEN: ${{ github.token }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ONLY: ${{ steps.add.outputs.query }}
+          MAX_PER_RUN: "1"
+          RESULT_FILE: ${{ runner.temp }}/result.json
+        run: npm run generate || true
+      - name: コミット
+        if: steps.add.outputs.query != ''
+        env:
           NAME: ${{ steps.add.outputs.name }}
           ISSUE: ${{ github.event.issue.number }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/products.txt
+          git add data public/data
           if ! git diff --cached --quiet; then
-            git commit -m "判定リクエストを追加: ${NAME} (#${ISSUE})"
+            git commit -m "判定リクエスト: ${NAME} (#${ISSUE})"
             git pull --rebase
             git push
           fi
-          gh workflow run generate.yml -f only="${NAME%%,*}"
-          gh issue comment "$ISSUE" --body "「${NAME}」を判定リストに追加し、判定を開始しました。数分〜十数分でサイトに反映されます。"
-          gh issue close "$ISSUE"
+      - name: 結果を返信
+        id: reply
+        if: steps.add.outputs.query != ''
+        env:
+          QUERY: ${{ steps.add.outputs.query }}
+          RESULT_FILE: ${{ runner.temp }}/result.json
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: node scripts/issue-reply.mjs
+      - name: Issue を更新
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          HAS_NAME: ${{ steps.add.outputs.query }}
+          CLOSE: ${{ steps.reply.outputs.close }}
+          LABEL: ${{ steps.reply.outputs.label }}
+        run: |
+          R="$GITHUB_REPOSITORY"
+          if [ -z "$HAS_NAME" ]; then
+            gh issue comment "$ISSUE" -R "$R" --body "商品名が読み取れませんでした。「商品名」の欄を入力してIssueを編集してください。"
+            gh issue edit "$ISSUE" -R "$R" --add-label "要確認"
+            exit 0
+          fi
+          if [ -f reply.md ]; then gh issue comment "$ISSUE" -R "$R" --body-file reply.md; fi
+          if [ "$CLOSE" = "true" ]; then
+            gh issue edit "$ISSUE" -R "$R" --remove-label "要確認" || true
+            gh issue close "$ISSUE" -R "$R"
+          elif [ -n "$LABEL" ]; then
+            gh issue edit "$ISSUE" -R "$R" --add-label "$LABEL"
+          fi

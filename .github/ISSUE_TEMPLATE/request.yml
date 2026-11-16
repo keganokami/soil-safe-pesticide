@@ -1,16 +1,45 @@
 name: 判定リクエスト
-description: まだ判定されていない農薬の判定を依頼します
+description: まだ判定されていない農薬の判定を依頼します（立てると自動で判定が始まります）
 title: "判定リクエスト: "
+labels: ["判定リクエスト"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        商品名を入れて送信すると、農林水産省の登録情報とWeb上の公的資料をもとに自動で判定します（数分〜十数分）。
+        結果はこのIssueにコメントで返します。**1つのIssueにつき1商品**でお願いします。
   - type: input
     id: name
     attributes:
       label: 商品名
-      description: 製品ラベルに書かれている名前（例：ロハピ）
+      description: 製品ラベルに書かれている名前
+      placeholder: 例）ロハピ
     validations:
       required: true
   - type: input
     id: reg
     attributes:
-      label: 登録番号（わかれば）
-      description: ラベルの「農林水産省登録第○○○○○号」の数字
+      label: 登録番号
+      description: ラベルの「農林水産省登録第○○○○○号」の数字。同じ名前の製品が複数あるときに特定できます
+      placeholder: 例）24181
+  - type: input
+    id: maker
+    attributes:
+      label: メーカー名
+      placeholder: 例）アース製薬
+  - type: textarea
+    id: crops
+    attributes:
+      label: 使いたい作物・困っている虫や病気
+      description: 書いてもらうと、その作物向けの使い方を優先して判定します
+      placeholder: 例）ミニトマトのアブラムシ
+  - type: textarea
+    id: photo
+    attributes:
+      label: ラベル写真
+      description: 画像をドラッグ＆ドロップで添付できます（商品の特定に使います）
+  - type: textarea
+    id: notes
+    attributes:
+      label: 自由記述
+      description: その他、気になっていることなど
