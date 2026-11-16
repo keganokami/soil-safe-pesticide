@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IndexEntry, VerdictFile } from "@/lib/data";
 import { Result } from "@/components/Result";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { isIndexEntry, isSafeId, isVerdictFile } from "@/lib/validate";
 import { VerdictChip } from "@/components/verdict-style";
 import { ChevronLeft, ChevronRight, Search, Sprout } from "@/components/icons";
 
@@ -29,7 +31,11 @@ async function fetchJson<T>(url: string, timeoutMs = 15000): Promise<T> {
   }
 }
 
-const idFromUrl = () => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("id"));
+const idFromUrl = () => {
+  if (typeof window === "undefined") return null;
+  const id = new URLSearchParams(window.location.search).get("id");
+  return isSafeId(id) ? id : null; // 不正な id は無視して一覧を表示
+};
 
 export default function Home() {
   const [index, setIndex] = useState<IndexEntry[] | null>(null);
@@ -43,8 +49,8 @@ export default function Home() {
   // 一覧の読み込み
   useEffect(() => {
     setError(null);
-    fetchJson<IndexEntry[]>(`${BASE}/data/index.json`)
-      .then(setIndex)
+    fetchJson<unknown>(`${BASE}/data/index.json`)
+      .then((d) => setIndex(Array.isArray(d) ? d.filter(isIndexEntry) : []))
       .catch((e) => setError(`判定データを読み込めませんでした（${e.message}）`));
   }, [reloadKey]);
 
@@ -65,8 +71,12 @@ export default function Home() {
     let alive = true;
     setLoadingDetail(true);
     setError(null);
-    fetchJson<VerdictFile>(`${BASE}/data/verdicts/${encodeURIComponent(selectedId)}.json`)
-      .then((d) => alive && setSelected(d))
+    fetchJson<unknown>(`${BASE}/data/verdicts/${encodeURIComponent(selectedId)}.json`)
+      .then((d) => {
+        if (!alive) return;
+        if (!isVerdictFile(d) || d.id !== selectedId) throw new Error("データ形式が不正です");
+        setSelected(d);
+      })
       .catch((e) => alive && setError(`判定結果を読み込めませんでした（${e.message}）`))
       .finally(() => alive && setLoadingDetail(false));
     window.scrollTo({ top: 0 });
@@ -129,7 +139,14 @@ export default function Home() {
           <>
             {errorBox}
             {loadingDetail && !selected && <Skeleton />}
-            {selected && <Result data={selected} />}
+            {selected && (
+              <ErrorBoundary
+                key={selected.id}
+                fallback={<p className="rounded-2xl border border-line bg-white p-5">この判定結果は表示できませんでした。</p>}
+              >
+                <Result data={selected} />
+              </ErrorBoundary>
+            )}
           </>
         ) : (
           <>

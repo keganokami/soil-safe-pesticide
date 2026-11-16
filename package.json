@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate": "tsx scripts/generate.mts"
+    "generate": "tsx scripts/generate.mts",
+    "prebuild": "node scripts/build-index.mjs",
+    "predev": "node scripts/build-index.mjs"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

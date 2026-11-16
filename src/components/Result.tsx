@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { VerdictFile } from "@/lib/data";
 import type { Verdict } from "@/lib/verdict";
+import { safeHref } from "@/lib/validate";
 import { ChevronDown, ExternalLink, ShieldAlert } from "./icons";
 import { LEVEL_STYLE, VERDICT_STYLE } from "./verdict-style";
 
@@ -234,11 +235,13 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 function SourceLink({ href, title }: { href: string; title: string }) {
+  const safe = safeHref(href);
+  if (!safe) return null;
   return (
     <a
-      href={href}
+      href={safe}
       target="_blank"
-      rel="noreferrer"
+      rel="noopener noreferrer nofollow"
       className="inline-flex min-h-11 items-start gap-1.5 py-2 text-sm break-all text-primary underline underline-offset-2"
     >
       <ExternalLink className="mt-0.5 h-4 w-4 shrink-0" />

@@ -1,12 +1,15 @@
-// Issue フォームの本文から商品名などを取り出し、
-//   data/products.txt に「商品名[,登録番号]」を追記
-//   data/requests.json に補足（メーカー・作物・自由記述）を保存
-// する。GitHub Actions の出力に name / query を返す。
-import { appendFileSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+// ① 入力ゲート（Issue 受付）
+// Issue フォームの本文から商品名などを取り出して検査し、合格なら data/requests/<issue>.json に保存する。
+// 1 Issue = 1 ファイルなので、同時に複数の Issue が来ても git の競合が起きない。
+// GitHub Actions の出力: query（商品名。空なら不受理）, reject_reason
+import { appendFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { checkProductName, cleanText, findNgWord } from "./guard.mjs";
 
-const body = process.env.ISSUE_BODY ?? "";
-const title = process.env.ISSUE_TITLE ?? "";
+const body = (process.env.ISSUE_BODY ?? "").slice(0, 20000);
+const title = (process.env.ISSUE_TITLE ?? "").slice(0, 300);
 const issue = Number(process.env.ISSUE_NUMBER ?? 0);
+const out = process.env.GITHUB_OUTPUT;
+const setOut = (k, v) => out && appendFileSync(out, `${k}=${String(v).replace(/[\r\n]/g, " ")}\n`);
 
 /** "### 見出し" 単位で本文を分解 */
 const sections = {};
@@ -16,39 +19,33 @@ for (const part of body.split(/^###\s+/m).slice(1)) {
   sections[head.trim()] = v === "_No response_" ? "" : v;
 }
 const get = (label) => sections[label] ?? "";
+// 複数行項目: 画像リンク・URL を除き、長さ制限
+const multi = (s, n) => cleanText(s.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/https?:\/\/\S+/g, ""), n).replace(/\s+/g, " ");
 
-// 1行項目: 改行・区切り文字・制御文字を除去
-const oneLine = (s, n) =>
-  s.normalize("NFKC").replace(/[\r\n#,`$\\<>|;&]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
-// 複数行項目: 画像リンクやHTMLを除き、長さを制限
-const multi = (s, n) =>
-  s.normalize("NFKC").replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim().slice(0, n);
+const reject = (reason) => {
+  console.log(`不受理: ${reason}`);
+  setOut("query", "");
+  setOut("reject_reason", reason);
+  process.exit(0);
+};
 
-const name = oneLine(get("商品名") || title.replace(/^判定リクエスト[:：]\s*/, ""), 60);
-const reg = oneLine(get("登録番号"), 20).replace(/\D/g, "").slice(0, 6);
-const maker = oneLine(get("メーカー名"), 60);
+if (!Number.isInteger(issue) || issue <= 0) reject("Issue番号が不正です");
+
+const rawName = get("商品名") || title.replace(/^判定リクエスト[:：]\s*/, "");
+const checked = checkProductName(rawName);
+if (!checked.ok) reject(checked.reason);
+
+const reg = cleanText(get("登録番号"), 20).replace(/\D/g, "").slice(0, 6);
+const maker = cleanText(get("メーカー名"), 60).replace(/[\r\n]/g, " ");
 const crops = multi(get("使いたい作物・困っている虫や病気"), 200);
 const notes = multi(get("自由記述"), 400);
+const ng = findNgWord([maker, crops, notes].join(" "), "input");
+if (ng) reject("不適切な語句が含まれています");
 
-const out = process.env.GITHUB_OUTPUT;
-const setOut = (k, v) => out && appendFileSync(out, `${k}=${v}\n`);
-
-if (!name) {
-  console.log("商品名が見つかりません");
-  setOut("name", "");
-  process.exit(0);
-}
-
-const line = reg ? `${name},${reg}` : name;
-const list = readFileSync("data/products.txt", "utf8").split("\n").map((l) => l.trim());
-if (!list.includes(line)) appendFileSync("data/products.txt", `${line}\n`);
-
-const reqPath = "data/requests.json";
-const reqs = existsSync(reqPath) ? JSON.parse(readFileSync(reqPath, "utf8")) : {};
-const info = Object.fromEntries(Object.entries({ maker, crops, notes, issue }).filter(([, v]) => v));
-reqs[name] = { ...(reqs[name] ?? {}), ...info };
-writeFileSync(reqPath, JSON.stringify(reqs, null, 2) + "\n");
-
-console.log(`追加: ${line}`, info);
-setOut("name", line);
-setOut("query", name);
+const info = Object.fromEntries(
+  Object.entries({ name: checked.name, reg, maker, crops, notes, issue }).filter(([, v]) => v),
+);
+mkdirSync("data/requests", { recursive: true });
+writeFileSync(`data/requests/${issue}.json`, JSON.stringify(info, null, 2) + "\n");
+console.log("受付:", info);
+setOut("query", checked.name);
