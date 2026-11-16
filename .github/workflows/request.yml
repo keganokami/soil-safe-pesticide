@@ -12,9 +12,14 @@ permissions:
   contents: write
   issues: write
 
+# 同じ Issue の判定は1本ずつ順番に。判定に関係ないラベル付与イベントは別グループにして、
+# Issue 作成と同時に発生するラベル付与で本来の判定が打ち切られないようにする
 concurrency:
-  group: request-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  group: >-
+    ${{ (github.event.action == 'labeled' && github.event.label.name != 'approved')
+        && format('noop-{0}', github.run_id)
+        || format('request-{0}', github.event.issue.number) }}
+  cancel-in-progress: false
 
 env:
   PER_USER_PER_DAY: "3"   # 1人あたり24時間の上限（リポジトリ所有者は対象外）
