@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { VerdictFile } from "@/lib/data";
 import type { Verdict } from "@/lib/verdict";
 import { safeHref } from "@/lib/validate";
-import { ChevronDown, ExternalLink, ShieldAlert } from "./icons";
+import { AlertTriangle, ChevronDown, ExternalLink, ShieldAlert } from "./icons";
 import { LEVEL_STYLE, VERDICT_STYLE } from "./verdict-style";
 
 /** keyCautions が無い古いデータ向けに、既存項目から最重要の注意点を組み立てる */
@@ -19,14 +19,17 @@ export function Result({ data }: { data: VerdictFile }) {
   const s = VERDICT_STYLE[v.verdict];
   const ok = v.verdict === "許可" || v.verdict === "条件付き許可";
   const cautions = cautionsOf(v);
-  const quick = ok
-    ? ([
-        ["区画あたりの量", v.usage.amountForPlot],
-        ["希釈", v.usage.dilution],
-        ["使用回数", v.usage.maxApplications],
-        ["使用時期", v.usage.timing],
-      ] as const).filter(([, t]) => t)
-    : [];
+  // 条件付きOKの警告に出すリスク（中・高のみ、高を先に）
+  const risks = (
+    [
+      ["土に残りやすい", v.soilAssessment.persistence],
+      ["土の中で移動しやすい", v.soilAssessment.mobility],
+      ["土の生き物に影響", v.soilAssessment.soilOrganisms],
+      ["こぼれると魚・水路に影響", v.soilAssessment.aquaticRiskOnSpill],
+    ] as const
+  )
+    .filter(([, a]) => a.level === "高" || a.level === "中")
+    .sort((a, b) => (a[1].level === "高" ? -1 : 0) - (b[1].level === "高" ? -1 : 0));
 
   return (
     <article className="space-y-4">
@@ -43,6 +46,38 @@ export function Result({ data }: { data: VerdictFile }) {
         </div>
         <Summary text={v.summary} />
       </section>
+
+      {/* ── ファーストビュー: 条件付きOKのリスク警告 ── */}
+      {v.verdict === "条件付き許可" && risks.length > 0 && (
+        <section
+          role="alert"
+          aria-labelledby="risk-title"
+          className="rounded-2xl border-2 border-danger bg-danger-soft px-5 py-3.5"
+        >
+          <h3 id="risk-title" className="flex items-center gap-2 text-base font-bold text-danger-strong">
+            <AlertTriangle className="h-5 w-5" />
+            この農薬のリスク
+          </h3>
+          <ul className="mt-2.5 flex flex-wrap gap-2">
+            {risks.map(([label, a]) => (
+              <li
+                key={label}
+                className="inline-flex items-center gap-1.5 rounded-full border border-danger/30 bg-white py-1 pr-3 pl-1 text-sm font-bold text-stone-900"
+              >
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs text-white ${a.level === "高" ? "bg-danger" : "bg-caution"}`}
+                >
+                  リスク{a.level}
+                </span>
+                {label}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2.5 text-xs text-danger-strong">
+            下の「必ず守ること」を守れない場合は使わないでください（詳細は「土壌への影響評価」）。
+          </p>
+        </section>
+      )}
 
       {/* ── ファーストビュー: 必ず守ること ── */}
       {cautions.length > 0 && (
@@ -67,18 +102,6 @@ export function Result({ data }: { data: VerdictFile }) {
           <p className="mt-3 text-xs text-caution-strong">
             製品ラベルの用法・用量を守り、ラベルに書かれていない作物には使わないでください。
           </p>
-        </section>
-      )}
-
-      {/* ── 使い方の要点 ── */}
-      {quick.length > 0 && (
-        <section aria-label="使い方の要点" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {quick.map(([k, t]) => (
-            <div key={k} className="rounded-xl border border-line bg-white px-4 py-3">
-              <p className="text-xs font-bold text-primary">{k}</p>
-              <p className="mt-1 line-clamp-4 text-sm leading-relaxed whitespace-pre-wrap">{t}</p>
-            </div>
-          ))}
         </section>
       )}
 

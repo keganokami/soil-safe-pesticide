@@ -15,7 +15,7 @@ const setOut = (k, v) => out && appendFileSync(out, `${k}=${String(v).replace(/[
 const sections = {};
 for (const part of body.split(/^###\s+/m).slice(1)) {
   const [head, ...rest] = part.split("\n");
-  const v = rest.join("\n").trim();
+  const v = rest.join("\n").replace(/<!--[\s\S]*?-->/g, "").trim();
   sections[head.trim()] = v === "_No response_" ? "" : v;
 }
 const get = (label) => sections[label] ?? "";

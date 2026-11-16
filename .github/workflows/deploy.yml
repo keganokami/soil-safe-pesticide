@@ -33,6 +33,8 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          NEXT_PUBLIC_REQUEST_FORM_URL: ${{ vars.REQUEST_FORM_URL }}
+          NEXT_PUBLIC_REQUEST_FORM_NAME_ENTRY: ${{ vars.REQUEST_FORM_NAME_ENTRY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

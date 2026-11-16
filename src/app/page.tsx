@@ -10,6 +10,21 @@ import { ChevronLeft, ChevronRight, Search, Sprout } from "@/components/icons";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "";
+// Googleフォーム（GitHubアカウント不要）。未設定なら GitHub Issue にフォールバック
+const FORM_URL = process.env.NEXT_PUBLIC_REQUEST_FORM_URL ?? "";
+const FORM_NAME_ENTRY = process.env.NEXT_PUBLIC_REQUEST_FORM_NAME_ENTRY ?? ""; // 例: entry.123456789
+
+function requestUrl(query: string): string | null {
+  if (FORM_URL) {
+    if (!FORM_NAME_ENTRY) return FORM_URL;
+    const u = new URL(FORM_URL);
+    u.searchParams.set("usp", "pp_url");
+    u.searchParams.set(FORM_NAME_ENTRY, query);
+    return u.toString();
+  }
+  if (REPO_URL) return `${REPO_URL}/issues/new?template=request.yml&title=${encodeURIComponent(`判定リクエスト: ${query}`)}`;
+  return null;
+}
 
 const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
 // ひらがな→カタカナ（「ろはぴ」でも「ロハピ」に当たるように）
@@ -211,9 +226,9 @@ export default function Home() {
               <div className="rounded-2xl border border-line bg-white p-5">
                 <p className="font-bold">「{query}」はまだ判定されていません</p>
                 <p className="mt-1 text-sm text-muted">判定は週1回まとめて追加されます。</p>
-                {REPO_URL && (
+                {requestUrl(query) && (
                   <a
-                    href={`${REPO_URL}/issues/new?template=request.yml&title=${encodeURIComponent(`判定リクエスト: ${query}`)}`}
+                    href={requestUrl(query)!}
                     target="_blank"
                     rel="noreferrer"
                     className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 font-bold text-white"

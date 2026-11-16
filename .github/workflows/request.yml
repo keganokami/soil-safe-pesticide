@@ -43,14 +43,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           AUTHOR: ${{ github.event.issue.user.login }}
           OWNER: ${{ github.repository_owner }}
+          # フォーム経由の Issue は所有者のトークンで作られるため、所有者の免除を適用しない（人単位の制限はフォーム側）
+          FROM_FORM: ${{ contains(github.event.issue.labels.*.name, 'フォーム経由') }}
         run: |
           SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
           TOTAL=$(gh issue list -R "$GITHUB_REPOSITORY" --label 判定リクエスト --state all --search "created:>=$SINCE" --limit 200 --json number -q 'length')
           MINE=$(gh issue list -R "$GITHUB_REPOSITORY" --label 判定リクエスト --state all --author "$AUTHOR" --search "created:>=$SINCE" --limit 200 --json number -q 'length')
-          echo "total=$TOTAL mine=$MINE"
-          if [ "$AUTHOR" != "$OWNER" ] && [ "$MINE" -gt "$PER_USER_PER_DAY" ]; then
+          echo "total=$TOTAL mine=$MINE from_form=$FROM_FORM"
+          EXEMPT=false
+          [ "$AUTHOR" = "$OWNER" ] && [ "$FROM_FORM" != "true" ] && EXEMPT=true
+          if [ "$EXEMPT" = "true" ]; then exit 0; fi
+          if [ "$FROM_FORM" != "true" ] && [ "$MINE" -gt "$PER_USER_PER_DAY" ]; then
             echo "reason=1人あたりの1日の上限（${PER_USER_PER_DAY}件）を超えました。時間をおいてお試しください" >> "$GITHUB_OUTPUT"
-          elif [ "$AUTHOR" != "$OWNER" ] && [ "$TOTAL" -gt "$TOTAL_PER_DAY" ]; then
+          elif [ "$TOTAL" -gt "$TOTAL_PER_DAY" ]; then
             echo "reason=本日の受付上限に達しました。時間をおいてお試しください" >> "$GITHUB_OUTPUT"
           fi
 

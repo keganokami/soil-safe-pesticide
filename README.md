@@ -13,7 +13,7 @@ data/products.txt ──(週1 Actions: npm run generate)──▶ public/data/*.
    ▲                     │
    │                     ├─ 1. 農林水産省 農薬登録情報提供システムで登録番号・有効成分・適用表を取得
    │                     └─ 2. Claude Code (claude -p, WebSearch/WebFetch) が環境データを調査し JSON スキーマで判定
-   └── Issue「判定リクエスト」に approved ラベル → 自動追加して即判定
+   └── Googleフォーム / Issue「判定リクエスト」→ 自動で受付・判定・返信
 ```
 
 | パス | 役割 |
@@ -26,7 +26,39 @@ data/products.txt ──(週1 Actions: npm run generate)──▶ public/data/*.
 | `public/data/` | 生成された判定データ |
 | `.github/workflows/generate.yml` | 週1回（月曜 3:00 JST）の生成 |
 | `.github/workflows/deploy.yml` | GitHub Pages へのデプロイ |
-| `.github/workflows/request.yml` | Issue からの判定リクエスト受付 |
+| `.github/workflows/request.yml` | Issue からの判定リクエスト受付（自動判定・返信） |
+| `gas/form-to-issue.gs` | Googleフォーム → Issue 連携（Apps Script） |
+| `scripts/guard.mjs` | ハーネスの決定的チェック（入力・出力・公開ゲート） |
+
+## 安全対策（ハーネス）
+
+いたずら・攻撃的な入力で不適切な結果が公開されたり、画面が壊れたりしないよう、多層で防御しています。
+
+| 層 | 内容 | 実装 |
+|---|---|---|
+| ① 入力ゲート | URL・HTML・記号のみ・同一文字の連続・NGワード・長さを決定的に拒否。1人3件/日・全体30件/日の回数制限 | `scripts/guard.mjs` `scripts/add-request.mjs` `request.yml` |
+| ② 対象判定ゲート | 農薬登録が見つからない名前は軽量モデル（Haiku）で「実在する農薬・園芸資材か」を判定。対象外は打ち切り | `scripts/generate.mts` |
+| ③ 出力ゲート | AI出力の型・列挙値・長さ・URL（http/https のみ）・NGワードを検査し無害化。不合格は公開しない | `scripts/guard.mjs` |
+| ④ 公開ゲート | ビルド時に検査済みの判定ファイルだけから一覧を作る。壊れた/改ざんされたファイルは除外 | `scripts/build-index.mjs` |
+| ⑤ 画面 | 配信データを型検査し不正なものは表示しない。危険なリンクを無効化。描画エラーは部分的に隔離 | `src/lib/validate.ts` `ErrorBoundary` |
+
+対象外と判定したリクエストは公開データに何も残さず、Issue に「対象外」ラベルを付けてクローズします。
+AI は WebSearch / WebFetch 以外のツールを使えず、空ディレクトリで実行されます。
+
+## Googleフォーム連携（GitHubアカウントが無い利用者向け）
+
+利用者は Google フォームから送信 → Apps Script が GitHub Issue を作成 → 上記の自動判定が動きます。
+
+1. GitHub で **fine-grained personal access token** を作成（対象リポジトリはこのリポジトリのみ、権限は **Issues: Read and write** のみ）
+2. https://script.google.com で新しいプロジェクトを作り、`gas/form-to-issue.gs` を貼り付け
+3. プロジェクトの設定 → スクリプト プロパティに `GITHUB_TOKEN` = 1 のトークンを追加
+4. エディタで関数 `setup` を実行（権限を承認）。フォームが作成され、送信トリガーが登録される
+5. 実行ログに出る URL を、リポジトリの Settings → Secrets and variables → Actions → **Variables** に設定
+   - `REQUEST_FORM_URL` = 回答用URL
+   - `REQUEST_FORM_NAME_ENTRY` = 事前入力URL中の `entry.数字`（サイトで検索した語をフォームに引き継ぐ）
+6. Actions →「GitHub Pages へデプロイ」を実行すると、サイトの「判定をリクエストする」がフォームに切り替わる
+
+フォーム経由の Issue には「フォーム経由」ラベルが付き、回数制限はフォーム側（全体30件/日）と Actions 側の両方でかかります。
 
 ## セットアップ
 
