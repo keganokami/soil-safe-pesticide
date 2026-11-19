@@ -6,7 +6,7 @@ import { Result } from "@/components/Result";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { isIndexEntry, isSafeId, isVerdictFile, safeHref } from "@/lib/validate";
 import { VerdictChip } from "@/components/verdict-style";
-import { ChevronLeft, ChevronRight, ExternalLink, Search, Sprout } from "@/components/icons";
+import { ChevronLeft, ChevronRight, ExternalLink, Search, Send, Sprout } from "@/components/icons";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "";
@@ -173,8 +173,11 @@ export default function Home() {
               の区画で、土の生き物を守りながら使えるかを判定しています。
             </p>
 
-            <label htmlFor="q" className="mt-5 mb-1.5 block text-sm font-bold">
-              商品名で探す
+            {/* まだ判定されていない商品 → リクエスト（常に見える位置に） */}
+            <RequestCard query={query.trim()} />
+
+            <label htmlFor="q" className="mt-6 mb-1.5 block text-sm font-bold">
+              判定済みの商品から探す{index && <span className="ml-1 font-normal text-muted">（{index.length}件）</span>}
             </label>
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-muted" />
@@ -184,22 +187,20 @@ export default function Home() {
                 enterKeyHint="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="例：ロハピ"
+                placeholder="商品名で絞り込み（例：ロハピ）"
                 autoComplete="off"
                 maxLength={60}
                 className="h-13 w-full rounded-2xl border border-line bg-white pr-4 pl-11 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
               />
             </div>
 
-            <div className="mt-5">{errorBox}</div>
+            <div className="mt-4">{errorBox}</div>
 
             {!index && !error && <Skeleton list />}
 
             {index && results.length > 0 && (
               <>
-                <p className="mb-2 text-xs text-muted">
-                  {query ? `${results.length} 件ヒット` : `判定済み ${index.length} 件`}
-                </p>
+                {query && <p className="mb-2 text-xs text-muted">{results.length} 件</p>}
                 <ul className="space-y-2">
                   {results.map((e) => (
                     <li key={e.id}>
@@ -225,20 +226,9 @@ export default function Home() {
             )}
 
             {index && results.length === 0 && (
-              <div className="rounded-2xl border border-line bg-white p-5">
-                <p className="font-bold">「{query}」はまだ判定されていません</p>
-                <p className="mt-1 text-sm text-muted">判定は週1回まとめて追加されます。</p>
-                {requestUrl(query) && (
-                  <a
-                    href={requestUrl(query)!}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 font-bold text-white"
-                  >
-                    判定をリクエストする
-                  </a>
-                )}
-              </div>
+              <p className="rounded-2xl border border-dashed border-line px-4 py-5 text-center text-sm text-muted">
+                「{query}」はまだ判定されていません。上のボタンからリクエストできます。
+              </p>
             )}
           </>
         )}
@@ -266,6 +256,31 @@ export default function Home() {
         </footer>
       </main>
     </div>
+  );
+}
+
+/** 未判定の商品のリクエスト導線。検索欄に入力した語はフォームに引き継ぐ */
+function RequestCard({ query }: { query: string }) {
+  const href = requestUrl(query);
+  if (!href) return null;
+  return (
+    <section aria-labelledby="req-title" className="mt-5 rounded-2xl border border-primary/25 bg-ok-soft/50 p-4">
+      <h2 id="req-title" className="font-bold text-primary-strong">
+        まだ判定されていない商品は？
+      </h2>
+      <p className="mt-1 text-sm leading-relaxed text-ink">
+        商品名を送ると自動で判定し、数分〜十数分でこのサイトに追加されます（登録不要・1分）。
+      </p>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 font-bold text-white transition-colors duration-200 hover:bg-primary-strong"
+      >
+        <Send className="h-5 w-5 shrink-0" />
+        <span className="line-clamp-2 py-2 text-center break-all">{query ? `「${query}」をリクエスト` : "判定をリクエストする"}</span>
+      </a>
+    </section>
   );
 }
 
