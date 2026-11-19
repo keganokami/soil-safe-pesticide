@@ -2,6 +2,18 @@
 
 > 日々の運用（要確認Issueの対応・再判定・取り下げ・トークン更新・トラブル対応）は **[運用マニュアル](docs/OPERATIONS.md)** を参照。
 
+## リンク
+
+| 用途 | URL |
+|---|---|
+| **アプリ** | https://keganokami.github.io/soil-safe-pesticide/ |
+| 判定リクエストフォーム（利用者向け） | https://docs.google.com/forms/d/e/1FAIpQLSdmxSPLwoT2VNAiS7wTBRIcDK2OZK2aiZKPwjD6V2Ah_dDK5A/viewform |
+| フォームの編集画面（管理者のみ開ける） | https://docs.google.com/forms/d/166_UDz4ltHQwpovw8ZCOB9rcsyEO06c6IStXnQ3VTIw/edit |
+| 「要確認」Issue 一覧 | https://github.com/keganokami/soil-safe-pesticide/issues?q=is%3Aopen+label%3A要確認 |
+| 運用マニュアル | [docs/OPERATIONS.md](docs/OPERATIONS.md) |
+
+個別の判定結果は `?id=登録番号` で直接開けます（例: ロハピ https://keganokami.github.io/soil-safe-pesticide/?id=24181）。
+
 農薬の**商品名**から、150cm×150cm（土の高さ約60cm）の区画で土壌の活性を損なわずに使えるかを判定し、
 結果を GitHub Pages で公開する静的サイトです。判定は **週1回の GitHub Actions** で Claude Code が生成します（API従量課金なし）。
 
