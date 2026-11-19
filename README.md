@@ -1,5 +1,7 @@
 # 土にやさしい農薬チェッカー
 
+> 日々の運用（要確認Issueの対応・再判定・取り下げ・トークン更新・トラブル対応）は **[運用マニュアル](docs/OPERATIONS.md)** を参照。
+
 農薬の**商品名**から、150cm×150cm（土の高さ約60cm）の区画で土壌の活性を損なわずに使えるかを判定し、
 結果を GitHub Pages で公開する静的サイトです。判定は **週1回の GitHub Actions** で Claude Code が生成します（API従量課金なし）。
 
@@ -49,16 +51,25 @@ AI は WebSearch / WebFetch 以外のツールを使えず、空ディレクト�
 
 利用者は Google フォームから送信 → Apps Script が GitHub Issue を作成 → 上記の自動判定が動きます。
 
-1. GitHub で **fine-grained personal access token** を作成（対象リポジトリはこのリポジトリのみ、権限は **Issues: Read and write** のみ）
-2. https://script.google.com で新しいプロジェクトを作り、`gas/form-to-issue.gs` を貼り付け
+1. GitHub で **fine-grained personal access token** を作成（対象リポジトリはこのリポジトリのみ、権限は **Issues: Read and write** のみ）。
+   入力済みリンク: https://github.com/settings/personal-access-tokens/new?name=soil-safe-form&target_name=keganokami&expires_in=366&issues=write
+2. Apps Script プロジェクトを作ってコードを送る（[clasp](https://github.com/google/clasp)。初回は https://script.google.com/home/usersettings で Apps Script API をオン）
+   ```bash
+   npx -y @google/clasp@3 login
+   cd gas && npx -y @google/clasp@3 create-script --type standalone --title "農薬チェッカー フォーム連携" --rootDir .
+   npx -y @google/clasp@3 push -f && npx -y @google/clasp@3 open-script
+   ```
+   （clasp を使わない場合は script.google.com で新規プロジェクトを作り `gas/form-to-issue.gs` を貼り付け）
 3. プロジェクトの設定 → スクリプト プロパティに `GITHUB_TOKEN` = 1 のトークンを追加
-4. エディタで関数 `setup` を実行（権限を承認）。フォームが作成され、送信トリガーが登録される
+4. エディタで関数 `setup` を実行（権限を承認）。フォームが公開状態で作成され、送信トリガーが登録される
+   - フォームを開いてログインを求められる場合は、編集画面の「公開」→ 回答者「リンクを知っている全員」
 5. 実行ログに出る URL を、リポジトリの Settings → Secrets and variables → Actions → **Variables** に設定
    - `REQUEST_FORM_URL` = 回答用URL
    - `REQUEST_FORM_NAME_ENTRY` = 事前入力URL中の `entry.数字`（サイトで検索した語をフォームに引き継ぐ）
 6. Actions →「GitHub Pages へデプロイ」を実行すると、サイトの「判定をリクエストする」がフォームに切り替わる
 
 フォーム経由の Issue には「フォーム経由」ラベルが付き、回数制限はフォーム側（全体30件/日）と Actions 側の両方でかかります。
+フォームの文言を変えるときは `gas/form-to-issue.gs` の `TEXT` を編集 → `clasp push` → エディタで `updateForm` を実行（`setup` の再実行は新しいフォームを作るので不要）。
 
 ## セットアップ
 

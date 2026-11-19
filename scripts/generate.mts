@@ -107,6 +107,11 @@ async function resolve(
     const details = await Promise.all(pool.map((c) => getDetail(c.registrationNumber)));
     const hit = details.filter((d) => normalize(Object.values(d.basic).join(" ")).includes(m));
     if (hit.length === 1) return { id: hit[0].registrationNumber, detail: hit[0] };
+    // メーカーで絞り切れなくても、候補はメーカー一致分だけに減らして提示する
+    if (hit.length > 1) {
+      const nums = new Set(hit.map((d) => d.registrationNumber));
+      return { ambiguous: pool.filter((c) => nums.has(c.registrationNumber)).map((c) => `${c.name},${c.registrationNumber}`) };
+    }
   }
   if (cands.length === 0) {
     const h = createHash("sha1").update(e.query).digest("hex").slice(0, 10);

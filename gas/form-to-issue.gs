@@ -9,6 +9,8 @@
  *   2. プロジェクトの設定 → スクリプト プロパティに GITHUB_TOKEN（Issues: Read and write のみの fine-grained PAT）を追加
  *   3. 関数 setup を選んで実行（初回は権限の承認が出る）→ フォームが作成され、送信トリガーが登録される
  *   4. ログに出るフォームURLを、GitHub リポジトリの Variables「REQUEST_FORM_URL」に設定
+ *
+ * 文言の変更: TEXT を書き換えて clasp push → エディタで updateForm を実行（フォームURLは変わらない）
  */
 
 const REPO = "keganokami/soil-safe-pesticide";
@@ -25,31 +27,59 @@ const Q = {
   notes: "自由記述",
 };
 
+// フォームの説明文（setup と updateForm で共通。文言を変えたら updateForm を実行する）
+const TEXT = {
+  title: "土にやさしい農薬チェッカー 判定リクエスト",
+  description:
+    "まだ判定されていない農薬の判定をリクエストできます。送信すると自動で判定が始まり、" +
+    "数分〜十数分後にサイトで商品名を検索すると結果が表示されます。\n\n" +
+    "【受け付けるもの】農薬（殺虫剤・殺菌剤・除草剤など）や園芸用の資材の商品名。1回の送信につき1商品です。\n\n" +
+    "【大事なお願い】同じ名前の製品がいくつもある農薬（例：スミチオン乳剤、マラソン乳剤、オルトラン粒剤）は、" +
+    "商品名だけだとどの製品か決まらず、判定が保留になります。" +
+    "製品ラベルにある「農林水産省登録第○○○○○号」の数字を「登録番号」欄に書いてください。" +
+    "わからない場合は、ラベルに書かれた名前を省略せずに（例：住化スミチオン乳剤）、メーカー名も書いてください。",
+  confirmation:
+    "リクエストを受け付けました。数分〜十数分後に、サイトで商品名を検索してください。\n" +
+    "・農薬や園芸資材の商品名として確認できなかった場合は掲載されません。\n" +
+    "・同じ名前の製品が複数あって決まらなかった場合は、管理者が確認してから掲載するため時間がかかります。",
+  help: {
+    name: "製品ラベルに書かれている名前を省略せずに（例：ロハピ、住化スミチオン乳剤）",
+    reg: "ラベルの「農林水産省登録第○○○○○号」の数字。同じ名前の製品が多い農薬では、これがあると確実に判定できます",
+    maker: "ラベルに書かれている会社名（例：アース製薬、住友化学）",
+    crops: "例：ミニトマトのアブラムシ（その作物向けの使い方を優先して判定します）",
+    notes: "そのほか伝えたいこと（任意）",
+  },
+};
+
+/** 説明文・ヘルプ文をフォームに反映する（質問の追加・削除はしない） */
+function applyTexts_(form) {
+  form.setTitle(TEXT.title);
+  form.setDescription(TEXT.description);
+  form.setConfirmationMessage(TEXT.confirmation);
+  const keyOf = Object.fromEntries(Object.entries(Q).map(([k, v]) => [v, k]));
+  form.getItems().forEach((item) => {
+    const k = keyOf[item.getTitle()];
+    if (k && TEXT.help[k]) item.setHelpText(TEXT.help[k]);
+  });
+}
+
 /** 初回だけ実行: フォームを作り、送信トリガーを登録する */
 function setup() {
-  const form = FormApp.create("土にやさしい農薬チェッカー 判定リクエスト");
-  form.setDescription(
-    "まだ判定されていない農薬の判定をリクエストできます。送信すると自動で判定が始まり、" +
-      "数分〜十数分後にサイトで商品名を検索すると結果が表示されます。\n" +
-      "※ 農薬（殺虫剤・殺菌剤・除草剤など）の商品名のみ受け付けます。1回の送信につき1商品でお願いします。",
-  );
+  const form = FormApp.create(TEXT.title);
   form.setCollectEmail(false);
   // API で作ったフォームは未公開（回答にログインが必要）になることがあるため明示的に公開する
   if (typeof form.setPublished === "function") form.setPublished(true);
   if (typeof form.setRequireLogin === "function") {
     try { form.setRequireLogin(false); } catch (_) { /* 個人アカウントでは不要 */ }
   }
-  form.setConfirmationMessage(
-    "リクエストを受け付けました。数分〜十数分後に、サイトで商品名を検索してください。\n" +
-      "農薬の商品名として確認できなかった場合は掲載されません。",
-  );
-  form.addTextItem().setTitle(Q.name).setHelpText("製品ラベルに書かれている名前（例：ロハピ）").setRequired(true)
+  form.addTextItem().setTitle(Q.name).setRequired(true)
     .setValidation(FormApp.createTextValidation().requireTextLengthLessThanOrEqualTo(60).build());
-  form.addTextItem().setTitle(Q.reg).setHelpText("ラベルの「農林水産省登録第○○○○○号」の数字（わかれば）")
+  form.addTextItem().setTitle(Q.reg)
     .setValidation(FormApp.createTextValidation().requireTextMatchesPattern("^[0-9０-９]{0,6}$").setHelpText("数字6桁以内").build());
-  form.addTextItem().setTitle(Q.maker).setHelpText("例：アース製薬（わかれば）");
-  form.addParagraphTextItem().setTitle(Q.crops).setHelpText("例：ミニトマトのアブラムシ（その作物向けの使い方を優先して判定します）");
+  form.addTextItem().setTitle(Q.maker);
+  form.addParagraphTextItem().setTitle(Q.crops);
   form.addParagraphTextItem().setTitle(Q.notes);
+  applyTexts_(form);
 
   ScriptApp.getProjectTriggers().forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger("onFormSubmit").forForm(form).onFormSubmit().create();
@@ -60,6 +90,15 @@ function setup() {
   const nameItem = form.getItems().find((i) => i.getTitle() === Q.name);
   const prefill = form.createResponse().withItemResponse(nameItem.asTextItem().createResponse("PREFILL")).toPrefilledUrl();
   Logger.log("事前入力URL（entry.xxx を REQUEST_FORM_NAME_ENTRY に設定）: " + prefill);
+}
+
+/** 文言だけ変えたいとき実行: 既存フォーム（送信トリガーの登録先）に TEXT を反映する。回答やURLは変わらない */
+function updateForm() {
+  const trigger = ScriptApp.getProjectTriggers().find((t) => t.getHandlerFunction() === "onFormSubmit");
+  if (!trigger) throw new Error("送信トリガーが見つかりません。先に setup を実行してください");
+  const form = FormApp.openById(trigger.getTriggerSourceId());
+  applyTexts_(form);
+  Logger.log("フォームの文言を更新しました: " + form.getPublishedUrl());
 }
 
 /** フォーム送信時: 回答を検査して Issue を作る */
