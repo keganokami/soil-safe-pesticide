@@ -24,8 +24,10 @@ const Q = {
   reg: "登録番号",
   maker: "メーカー名",
   crops: "使いたい作物・困っている虫や病気",
-  notes: "自由記述",
 };
+
+// 以前あった質問（updateForm で既存フォームから削除する）
+const REMOVED_QUESTIONS = ["自由記述"];
 
 // フォームの説明文（setup と updateForm で共通。文言を変えたら updateForm を実行する）
 const TEXT = {
@@ -47,7 +49,6 @@ const TEXT = {
     reg: "ラベルの「農林水産省登録第○○○○○号」の数字。同じ名前の製品が多い農薬では、これがあると確実に判定できます",
     maker: "ラベルに書かれている会社名（例：アース製薬、住友化学）",
     crops: "例：ミニトマトのアブラムシ（その作物向けの使い方を優先して判定します）",
-    notes: "そのほか伝えたいこと（任意）",
   },
 };
 
@@ -78,7 +79,6 @@ function setup() {
     .setValidation(FormApp.createTextValidation().requireTextMatchesPattern("^[0-9０-９]{0,6}$").setHelpText("数字6桁以内").build());
   form.addTextItem().setTitle(Q.maker);
   form.addParagraphTextItem().setTitle(Q.crops);
-  form.addParagraphTextItem().setTitle(Q.notes);
   applyTexts_(form);
 
   ScriptApp.getProjectTriggers().forEach((t) => ScriptApp.deleteTrigger(t));
@@ -97,6 +97,8 @@ function updateForm() {
   const trigger = ScriptApp.getProjectTriggers().find((t) => t.getHandlerFunction() === "onFormSubmit");
   if (!trigger) throw new Error("送信トリガーが見つかりません。先に setup を実行してください");
   const form = FormApp.openById(trigger.getTriggerSourceId());
+  // 廃止した質問を削除（自由記述は要望アンケートに分離。判定には使えないため）
+  form.getItems().filter((i) => REMOVED_QUESTIONS.includes(i.getTitle())).forEach((i) => form.deleteItem(i));
   applyTexts_(form);
   Logger.log("フォームの文言を更新しました: " + form.getPublishedUrl());
 }
@@ -147,7 +149,6 @@ function onFormSubmit(e) {
     field(Q.maker, clean(answers[Q.maker], 60)),
     field(Q.crops, clean(answers[Q.crops], 200)),
     field("ラベル写真", ""),
-    field(Q.notes, clean(answers[Q.notes], 400)),
     "<!-- Googleフォームから自動作成 -->",
   ].join("\n");
 

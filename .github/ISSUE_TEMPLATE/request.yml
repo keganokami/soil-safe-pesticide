@@ -38,8 +38,3 @@ body:
     attributes:
       label: ラベル写真
       description: 画像をドラッグ＆ドロップで添付できます（商品の特定に使います）
-  - type: textarea
-    id: notes
-    attributes:
-      label: 自由記述
-      description: その他、気になっていることなど
