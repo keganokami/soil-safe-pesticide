@@ -181,6 +181,7 @@ npx -y @google/clasp@3 open-script    # エディタを開く
 | `GITHUB_TOKEN` | Apps Script → プロジェクトの設定 → **スクリプト プロパティ** | フォームから Issue を作る | 作成時に選んだ期限（既定約1年）。下の手順で作り直す |
 | `REQUEST_FORM_URL` | GitHub → … → Actions → **Variables** | サイトのリクエストボタンの飛び先 | フォームを作り直したときだけ変更 → デプロイ再実行 |
 | `REQUEST_FORM_NAME_ENTRY` | 同上 | 検索語をフォームに引き継ぐ（`entry.671073678`） | 同上 |
+| `FEEDBACK_FORM_URL` | 同上 | フッターの「ご意見・ご要望」リンク（未設定なら非表示） | 変更したらデプロイ再実行 |
 
 **GitHub トークン（フォーム用）の作り直し**
 

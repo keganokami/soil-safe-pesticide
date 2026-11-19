@@ -35,6 +35,7 @@ jobs:
           NEXT_PUBLIC_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           NEXT_PUBLIC_REQUEST_FORM_URL: ${{ vars.REQUEST_FORM_URL }}
           NEXT_PUBLIC_REQUEST_FORM_NAME_ENTRY: ${{ vars.REQUEST_FORM_NAME_ENTRY }}
+          NEXT_PUBLIC_FEEDBACK_FORM_URL: ${{ vars.FEEDBACK_FORM_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

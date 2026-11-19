@@ -4,15 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IndexEntry, VerdictFile } from "@/lib/data";
 import { Result } from "@/components/Result";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { isIndexEntry, isSafeId, isVerdictFile } from "@/lib/validate";
+import { isIndexEntry, isSafeId, isVerdictFile, safeHref } from "@/lib/validate";
 import { VerdictChip } from "@/components/verdict-style";
-import { ChevronLeft, ChevronRight, Search, Sprout } from "@/components/icons";
+import { ChevronLeft, ChevronRight, ExternalLink, Search, Sprout } from "@/components/icons";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "";
 // Googleフォーム（GitHubアカウント不要）。未設定なら GitHub Issue にフォールバック
 const FORM_URL = process.env.NEXT_PUBLIC_REQUEST_FORM_URL ?? "";
 const FORM_NAME_ENTRY = process.env.NEXT_PUBLIC_REQUEST_FORM_NAME_ENTRY ?? ""; // 例: entry.123456789
+// 要望・感想アンケート（未設定ならリンクを出さない）
+const FEEDBACK_URL = safeHref(process.env.NEXT_PUBLIC_FEEDBACK_FORM_URL ?? "");
 
 function requestUrl(query: string): string | null {
   if (FORM_URL) {
@@ -250,6 +252,17 @@ export default function Home() {
             。環境データはAIが公的機関・メーカー・専門データベースを調査して要約したものです。
           </p>
           <p className="mt-2">本判定は参考情報です。使用前に必ず製品ラベルを確認し、農薬取締法に従ってください。</p>
+          {FEEDBACK_URL && (
+            <a
+              href={FEEDBACK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-white px-4 text-sm font-bold text-primary"
+            >
+              ご意見・ご要望をお聞かせください
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          )}
         </footer>
       </main>
     </div>
