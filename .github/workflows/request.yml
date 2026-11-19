@@ -6,7 +6,7 @@ name: 判定リクエストの受付
 # 候補が複数（要確認）のときは Issue を編集すると再判定。手動やり直しは「approved」ラベル。
 on:
   issues:
-    types: [opened, edited, labeled]
+    types: [edited, labeled]
 
 permissions:
   contents: write
@@ -14,9 +14,11 @@ permissions:
 
 # 同じ Issue の判定は1本ずつ順番に。判定に関係ないラベル付与イベントは別グループにして、
 # Issue 作成と同時に発生するラベル付与で本来の判定が打ち切られないようにする
+# ※ API（Googleフォーム経由）で作った Issue は opened 時点でラベルが載らないため、
+#   起動は「判定リクエスト」ラベルの付与イベントで行う（テンプレート経由でも同じく発火する）
 concurrency:
   group: >-
-    ${{ (github.event.action == 'labeled' && github.event.label.name != 'approved')
+    ${{ (github.event.action == 'labeled' && github.event.label.name != 'approved' && github.event.label.name != '判定リクエスト')
         && format('noop-{0}', github.run_id)
         || format('request-{0}', github.event.issue.number) }}
   cancel-in-progress: false
@@ -29,7 +31,7 @@ jobs:
   judge:
     if: >-
       github.event.issue.state == 'open' && !github.event.issue.pull_request && (
-        (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, '判定リクエスト')) ||
+        (github.event.action == 'labeled' && github.event.label.name == '判定リクエスト') ||
         (github.event.action == 'edited' && contains(github.event.issue.labels.*.name, '要確認')) ||
         (github.event.action == 'labeled' && github.event.label.name == 'approved')
       )
