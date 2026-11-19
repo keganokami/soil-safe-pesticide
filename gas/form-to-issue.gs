@@ -34,6 +34,11 @@ function setup() {
       "※ 農薬（殺虫剤・殺菌剤・除草剤など）の商品名のみ受け付けます。1回の送信につき1商品でお願いします。",
   );
   form.setCollectEmail(false);
+  // API で作ったフォームは未公開（回答にログインが必要）になることがあるため明示的に公開する
+  if (typeof form.setPublished === "function") form.setPublished(true);
+  if (typeof form.setRequireLogin === "function") {
+    try { form.setRequireLogin(false); } catch (_) { /* 個人アカウントでは不要 */ }
+  }
   form.setConfirmationMessage(
     "リクエストを受け付けました。数分〜十数分後に、サイトで商品名を検索してください。\n" +
       "農薬の商品名として確認できなかった場合は掲載されません。",
