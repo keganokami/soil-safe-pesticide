@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AXES, CRITERIA_VERSION, GOAL, PLOT_TEXT, SOURCES, SOURCE_RULES, VERDICT_RULES } from "@/lib/criteria";
+import { AXES, CRITERIA_VERSION, GOAL, PREREQUISITES, REQUIRED_CAUTIONS, SCENE, SOURCES, SOURCE_RULES, VERDICT_RULES } from "@/lib/criteria";
 import { LEVEL_STYLE, VerdictChip } from "@/components/verdict-style";
-import { ChevronLeft } from "@/components/icons";
+import { ChevronLeft, ExternalLink } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "判定基準 | 土にやさしい農薬チェッカー",
@@ -29,8 +29,19 @@ export default function CriteriaPage() {
             <strong className="block text-primary-strong">目的</strong>
             {GOAL}
           </p>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed text-ink">
-            {PLOT_TEXT.map((t) => (
+          <h2 className="mt-5 text-sm font-bold">想定している使用場面</h2>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm leading-relaxed text-ink">
+            {SCENE.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="pre">
+          <h2 id="pre" className="text-lg font-bold">使える製品の前提</h2>
+          <p className="mt-1 text-sm text-muted">どれか1つでも満たさない場合は使用NGです。</p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed">
+            {PREREQUISITES.map((t) => (
               <li key={t}>{t}</li>
             ))}
           </ul>
@@ -40,10 +51,11 @@ export default function CriteriaPage() {
           <h2 id="flow" className="text-lg font-bold">判定の流れ</h2>
           <ol className="mt-3 space-y-2 text-sm leading-relaxed">
             {[
-              "農林水産省の登録情報から、有効成分・適用作物・使用量を取得",
-              "有効成分ごとに、下の4項目の値を公的機関・専門データベースで調査",
+              "農林水産省の登録情報から、有効成分・適用作物・使用量・製剤毒性を取得",
+              "メーカーのラベルで「水産動植物」の注意事項を確認し、有効成分の値を公的機関・専門データベースで調査",
               "しきい値に当てはめて、各項目のリスクを「低・中・高・不明」で評価",
               "判定区分のルールを上から順に当てはめて、使用OK／条件付きOK／使用NG／判定不能を決定",
+              "毒物・劇物、除草剤、くん蒸剤、川への影響「高」などは、AIの判定に関係なくプログラムで使用NGにする",
             ].map((t, i) => (
               <li key={t} className="flex gap-3">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
@@ -79,11 +91,12 @@ export default function CriteriaPage() {
                   ))}
                 </dl>
                 {a.note && <p className="mt-2 text-xs text-muted">※ {a.note}</p>}
+                <p className="mt-2 text-xs text-muted">根拠: {a.sources.join("・")}（下の出典一覧）</p>
               </article>
             ))}
           </div>
           <p className="mt-2 text-xs text-muted">
-            しきい値は、PPDB（農薬特性データベース）や欧州の評価で使われる区分を参考に、本サイトが定めたものです。
+            しきい値は、FAMICの審査ガイダンス（ラベル表示の区分）とPPDB（農薬特性データベース）の区分に合わせています。
           </p>
         </section>
 
@@ -104,16 +117,43 @@ export default function CriteriaPage() {
           </ol>
         </section>
 
-        <section aria-labelledby="sources">
-          <h2 id="sources" className="text-lg font-bold">情報源（優先順）</h2>
-          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm leading-relaxed">
-            {SOURCES.map((s) => (
-              <li key={s}>{s}</li>
+        <section aria-labelledby="must">
+          <h2 id="must" className="text-lg font-bold">「必ず守ること」に必ず入れる観点</h2>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed">
+            {REQUIRED_CAUTIONS.map((t) => (
+              <li key={t}>{t}</li>
             ))}
-          </ol>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted">
+          </ul>
+        </section>
+
+        <section aria-labelledby="research">
+          <h2 id="research" className="text-lg font-bold">調査のルール</h2>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed">
             {SOURCE_RULES.map((s) => (
               <li key={s}>{s}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="sources">
+          <h2 id="sources" className="text-lg font-bold">出典一覧</h2>
+          <ul className="mt-3 space-y-1">
+            {SOURCES.map((src) => (
+              <li key={src.id}>
+                <a
+                  href={src.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-start gap-1.5 py-2 text-sm text-primary underline underline-offset-2"
+                >
+                  <span className="shrink-0 font-bold no-underline">{src.id}</span>
+                  <span>
+                    {src.title}
+                    <span className="text-muted">（{src.org}）</span>
+                  </span>
+                  <ExternalLink className="mt-0.5 h-4 w-4 shrink-0" />
+                </a>
+              </li>
             ))}
           </ul>
         </section>

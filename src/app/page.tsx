@@ -175,9 +175,9 @@ export default function Home() {
         ) : (
           <>
             <p className="text-[15px] leading-relaxed text-muted">
-              農林水産省の農薬登録情報と専門機関の環境データをもとに、
-              <strong className="text-ink">150×150cm・土の高さ約60cm</strong>
-              の区画で、土の生き物を守りながら使えるかを判定しています。
+              マンション共用スペースの
+              <strong className="text-ink">150×150cmの区画</strong>
+              で、土の生き物を守り、こぼれても近くの川・植栽・住民に影響しないかを、農林水産省の登録情報と専門機関のデータをもとに判定しています。
             </p>
 
             {/* まだ判定されていない商品 → リクエスト（常に見える位置に） */}

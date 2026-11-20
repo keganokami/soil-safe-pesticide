@@ -28,7 +28,7 @@ import path from "node:path";
 import { searchByName, getDetail, normalize, type PesticideDetail } from "../src/lib/famic.ts";
 import { SYSTEM_PROMPT, buildUserMessage } from "../src/lib/prompt.ts";
 import { VERDICT_JSON_SCHEMA, type Verdict } from "../src/lib/verdict.ts";
-import { CRITERIA_VERSION } from "../src/lib/criteria.ts";
+import { CRITERIA_VERSION, applyHardRules } from "../src/lib/criteria.ts";
 import type { VerdictFile } from "../src/lib/data.ts";
 import { checkProductName, cleanText, sanitizeVerdict } from "./guard.mjs";
 
@@ -290,6 +290,10 @@ async function main() {
         results.push({ query: e.query, status: "rejected", message: "判定結果が公開基準を満たしませんでした" });
         continue;
       }
+      // 決定的ルール（毒物・劇物、除草剤、くん蒸剤、川リスク高など）は AI の判定より優先する
+      const hard = applyHardRules(detail, checked.verdict as Verdict);
+      if (hard.overridden) log(`- ⚖️ ${e.query} (${id}): 基準により「不可」に補正（${hard.overridden}）`);
+      checked.verdict = hard.verdict;
       if (!detail && checked.verdict.verdict === "判定不能") {
         log(`- 🚫 ${e.query} (${id}): 未登録かつ判定不能のため公開しない`);
         results.push({ query: e.query, status: "rejected", message: "製品を特定できませんでした" });

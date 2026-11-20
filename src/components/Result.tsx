@@ -23,10 +23,10 @@ export function Result({ data }: { data: VerdictFile }) {
   // 条件付きOKの警告に出すリスク（中・高のみ、高を先に）
   const risks = (
     [
-      ["土に残りやすい", v.soilAssessment.persistence],
+      ["こぼれると川の生き物に影響", v.soilAssessment.aquaticRiskOnSpill],
       ["土の中で移動しやすい", v.soilAssessment.mobility],
+      ["土に残りやすい", v.soilAssessment.persistence],
       ["土の生き物に影響", v.soilAssessment.soilOrganisms],
-      ["こぼれると魚・水路に影響", v.soilAssessment.aquaticRiskOnSpill],
     ] as const
   )
     .filter(([, a]) => a.level === "高" || a.level === "中")
@@ -75,7 +75,7 @@ export function Result({ data }: { data: VerdictFile }) {
             ))}
           </ul>
           <p className="mt-2.5 text-xs text-danger-strong">
-            下の「必ず守ること」を守れない場合は使わないでください（詳細は「土壌への影響評価」）。
+            下の「必ず守ること」を守れない場合は使わないでください（詳細は「川・土への影響評価」）。
           </p>
         </section>
       )}
@@ -138,14 +138,14 @@ export function Result({ data }: { data: VerdictFile }) {
           </Section>
         )}
 
-        <Section title="土壌への影響評価" defaultOpen={!ok}>
+        <Section title="川・土への影響評価" defaultOpen={!ok}>
           <ul className="space-y-4">
             {(
               [
-                ["土壌残留性", v.soilAssessment.persistence],
+                ["川への影響", v.soilAssessment.aquaticRiskOnSpill],
                 ["土壌移動性", v.soilAssessment.mobility],
+                ["土壌残留性", v.soilAssessment.persistence],
                 ["土壌生物への影響", v.soilAssessment.soilOrganisms],
-                ["こぼれた時の影響", v.soilAssessment.aquaticRiskOnSpill],
               ] as const
             ).map(([label, a]) => (
               <li key={label}>

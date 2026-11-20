@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "土にやさしい農薬チェッカー",
-  description: "農薬の商品名から、小区画の土壌に使ってよいかを公式情報をもとに判定します",
+  description: "農薬の商品名から、マンション共用スペースの区画で使ってよいか（土・川・植栽・住民への影響）を公式情報をもとに判定します",
 };
 
 export const viewport: Viewport = {
