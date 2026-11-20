@@ -18,6 +18,8 @@ export type VerdictFile = {
   query: string;
   generatedAt: string;
   model: string;
+  /** 判定に使った基準の版（criteria.ts の CRITERIA_VERSION）。古いデータには無い */
+  criteriaVersion?: number;
   detail: PesticideDetail | null;
   verdict: Verdict;
 };

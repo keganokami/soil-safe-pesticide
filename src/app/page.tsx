@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { IndexEntry, VerdictFile } from "@/lib/data";
 import { Result } from "@/components/Result";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -148,6 +149,12 @@ export default function Home() {
               土にやさしい農薬チェッカー
             </p>
           )}
+          <Link
+            href="/criteria/"
+            className="ml-auto flex min-h-11 items-center rounded-xl px-2 text-sm font-bold text-primary underline-offset-2 hover:underline"
+          >
+            判定基準
+          </Link>
         </div>
       </header>
 
@@ -241,7 +248,13 @@ export default function Home() {
             </a>
             。環境データはAIが公的機関・メーカー・専門データベースを調査して要約したものです。
           </p>
-          <p className="mt-2">本判定は参考情報です。使用前に必ず製品ラベルを確認し、農薬取締法に従ってください。</p>
+          <p className="mt-2">
+            本判定は参考情報です。判定のしかたは
+            <Link href="/criteria/" className="underline">
+              判定基準
+            </Link>
+            をご覧ください。使用前に必ず製品ラベルを確認し、農薬取締法に従ってください。
+          </p>
           {FEEDBACK_URL && (
             <a
               href={FEEDBACK_URL}

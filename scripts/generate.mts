@@ -13,7 +13,7 @@
  * 環境変数:
  *   CLAUDE_CODE_OAUTH_TOKEN  Claude Code の認証（`claude setup-token` で発行。Max/Pro プラン）
  *   MAX_PER_RUN   1回で生成する最大件数（既定 10）
- *   STALE_DAYS    この日数より古い判定は作り直す（既定 90）
+ *   STALE_DAYS    この日数より古い判定は作り直す（既定 90）。判定基準の版が古いものも作り直す
  *   ONLY          指定した商品名だけを強制的に生成（カンマ区切り）
  *   RESULT_FILE   生成結果を JSON で書き出す先（Issue への返信用）
  *   CLAUDE_MODEL  判定モデル（既定 claude-opus-5-5）
@@ -28,6 +28,7 @@ import path from "node:path";
 import { searchByName, getDetail, normalize, type PesticideDetail } from "../src/lib/famic.ts";
 import { SYSTEM_PROMPT, buildUserMessage } from "../src/lib/prompt.ts";
 import { VERDICT_JSON_SCHEMA, type Verdict } from "../src/lib/verdict.ts";
+import { CRITERIA_VERSION } from "../src/lib/criteria.ts";
 import type { VerdictFile } from "../src/lib/data.ts";
 import { checkProductName, cleanText, sanitizeVerdict } from "./guard.mjs";
 
@@ -253,7 +254,9 @@ async function main() {
     const file = path.join(VERDICT_DIR, `${id}.json`);
     if (existsSync(file) && !forced) {
       const prev = JSON.parse(await readFile(file, "utf8")) as VerdictFile;
-      if (now - Date.parse(prev.generatedAt) < STALE_DAYS * 86400_000) {
+      // 期限内かつ現行の判定基準で作られたものは作り直さない（基準を改定したら自動で再判定）
+      const fresh = now - Date.parse(prev.generatedAt) < STALE_DAYS * 86400_000;
+      if (fresh && (prev.criteriaVersion ?? 1) >= CRITERIA_VERSION) {
         results.push({ query: e.query, status: "skipped", id, verdict: prev.verdict.verdict, message: "判定済み" });
         continue;
       }
@@ -298,6 +301,7 @@ async function main() {
         query: e.query,
         generatedAt: new Date().toISOString(),
         model: MODEL,
+        criteriaVersion: CRITERIA_VERSION,
         detail,
         verdict: checked.verdict as Verdict,
       };

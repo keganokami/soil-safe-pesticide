@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { VerdictFile } from "@/lib/data";
 import type { Verdict } from "@/lib/verdict";
 import { safeHref } from "@/lib/validate";
@@ -158,6 +159,9 @@ export function Result({ data }: { data: VerdictFile }) {
               </li>
             ))}
           </ul>
+          <Link href="/criteria/" className="mt-4 inline-flex min-h-11 items-center text-sm font-bold text-primary underline underline-offset-2">
+            リスクの区分と判定のしかた（判定基準）
+          </Link>
         </Section>
 
         {v.reasons.length > 0 && (
